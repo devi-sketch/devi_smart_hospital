@@ -75,7 +75,7 @@ with st.form("triage_form"):
     with c5:
         skin_rash = st.checkbox("🔴  Skin Rash")
 
-    # st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
 
     # Section 2 — Duration & Complaint
     st.markdown("""
