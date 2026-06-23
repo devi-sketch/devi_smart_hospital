@@ -22,6 +22,40 @@ temp_map      = bundle['temp_map']
 hr_map        = bundle['hr_map']
 dur_map       = bundle['dur_map']
 cc_map        = bundle['cc_map']
+
+# dictionary
+DEPT_INFO = {
+    'Respiratory Medicine': {
+        'icon':'🫁','color':'#0284c7','bg':'#e0f2fe','border':'#7dd3fc',
+        'desc':'Specialises in conditions affecting the lungs and airways.',
+        'next':['Visit Level 2, Wing B','Estimated wait: 15–25 min','Please wear a mask']
+    },
+    'Cardiology': {
+        'icon':'❤️','color':'#dc2626','bg':'#fee2e2','border':'#fca5a5',
+        'desc':'Specialises in heart and cardiovascular conditions.',
+        'next':['Visit Level 3, Wing A','Estimated wait: 20–30 min','Bring any previous ECG reports']
+    },
+    'Gastroenterology': {
+        'icon':'🫃','color':'#d97706','bg':'#fef3c7','border':'#fcd34d',
+        'desc':'Specialises in digestive system and abdominal conditions.',
+        'next':['Visit Level 1, Wing C','Estimated wait: 10–20 min','Avoid eating before consultation']
+    },
+    'Neurology': {
+        'icon':'🧠','color':'#7c3aed','bg':'#ede9fe','border':'#c4b5fd',
+        'desc':'Specialises in brain, spine, and nervous system conditions.',
+        'next':['Visit Level 4, Wing A','Estimated wait: 25–35 min','Bring list of current medications']
+    },
+    'General Medicine': {
+        'icon':'🩺','color':'#059669','bg':'#d1fae5','border':'#6ee7b7',
+        'desc':'Handles general health concerns and non-specialist conditions.',
+        'next':['Visit Level 1, Wing A','Estimated wait: 10–15 min','Registration desk is open 24/7']
+    },
+    'Dermatology': {
+        'icon':'🔬','color':'#b45309','bg':'#fef9c3','border':'#fde68a',
+        'desc':'Specialises in skin, hair, and nail conditions.',
+        'next':['Visit Level 2, Wing D','Estimated wait: 15–20 min','Bring photos of affected area if possible']
+    },
+}
     
 # ── Hero Header ───────────────────────────────────────────────────────────────
 st.markdown("""
@@ -154,4 +188,114 @@ with st.form("triage_form"):
     with col_gen:
         gender = st.selectbox("Gender", options=['Female', 'Male'])
 
-    # submitted = st.form_submit_button("Get AI Recommendation →")
+    submitted = st.form_submit_button("Get AI Recommendation →")
+
+if submitted:
+    patient = pd.DataFrame([{
+        'age'              : age,
+        'gender'           : gender_map.get(gender, 0),
+        'fever'            : int(fever),
+        'cough'            : int(cough),
+        'headache'         : int(headache),
+        'chest_pain'       : int(chest_pain),
+        'stomach_pain'     : int(stomach_pain),
+        'shortness_breath' : int(shortness_breath),
+        'nausea_vomiting'  : int(nausea_vomiting),
+        'dizziness'        : int(dizziness),
+        'skin_rash'        : int(skin_rash),
+        'temperature_level': temp_map.get(temperature_level, 1),
+        'heart_rate_level' : hr_map.get(heart_rate_level, 1),
+        'duration'         : dur_map.get(duration, 1),
+        'asthma'           : int(asthma),
+        'hypertension'     : int(hypertension),
+        'heart_disease'    : int(heart_disease),
+        'chief_complaint'  : cc_map.get(chief_complaint, 9)
+    }])
+
+    patient_scaled = patient.copy()
+    patient_scaled[cols_to_scale] = scaler.transform(patient[cols_to_scale])
+
+    pred       = model.predict(patient_scaled[features])[0]
+    proba      = model.predict_proba(patient_scaled[features])[0]
+    dept_name  = dept_map_inv[pred]
+    confidence = proba[pred] * 100
+    info       = DEPT_INFO[dept_name]
+
+    st.markdown("---")
+    st.markdown("""
+    <div style="font-size:22px;font-weight:700;color:#111827;margin-bottom:4px;">AI Recommendation</div>
+    <div style="font-size:14px;color:#6b7280;margin-bottom:1.5rem;">Based on the information you provided</div>
+    """, unsafe_allow_html=True)
+
+    res_col, prob_col = st.columns([3, 2])
+
+    with res_col:
+        steps_html = ''.join(
+            f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'
+            f'<span style="color:{info["color"]};font-size:14px;">📍</span>'
+            f'<span style="font-size:14px;color:#374151;">{step}</span></div>'
+            for step in info['next']
+        )
+        st.markdown(f"""
+        <div style="background:{info['bg']};border:1.5px solid {info['border']};
+                    border-radius:16px;padding:28px 32px;">
+            <div style="font-size:44px;margin-bottom:12px;">{info['icon']}</div>
+            <div style="font-size:26px;font-weight:700;color:{info['color']};margin-bottom:8px;">{dept_name}</div>
+            <div style="font-size:14px;color:#374151;margin-bottom:20px;">
+                Our AI suggests you visit the <strong>{dept_name}</strong> Department.
+            </div>
+            <div style="font-size:11px;font-weight:600;color:{info['color']};text-transform:uppercase;
+                        letter-spacing:0.08em;margin-bottom:8px;">Why?</div>
+            <div style="font-size:14px;color:#4b5563;margin-bottom:20px;">{info['desc']} Your reported symptoms and vitals match patients typically directed to this department.</div>
+            <div style="font-size:11px;font-weight:600;color:{info['color']};text-transform:uppercase;
+                        letter-spacing:0.08em;margin-bottom:10px;">What to do next?</div>
+            {steps_html}
+            <div style="margin-top:20px;padding:12px 16px;background:rgba(0,0,0,0.05);
+                        border-radius:10px;font-size:12px;color:#6b7280;line-height:1.5;">
+                ⚠️ This is an AI suggestion, not a medical diagnosis. Please consult a doctor for further evaluation.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with prob_col:
+        st.markdown(f"""
+        <div style="background:white;border:1px solid #e5e7eb;border-radius:16px;padding:24px;">
+            <div style="font-size:14px;font-weight:600;color:#111827;margin-bottom:16px;">
+                Confidence by department
+            </div>
+        """, unsafe_allow_html=True)
+
+        sorted_depts = sorted(dept_map_inv.items(), key=lambda x: proba[x[0]], reverse=True)
+        bars_html = ""
+        for idx, dname in sorted_depts:
+            pct    = proba[idx] * 100
+            dinfo  = DEPT_INFO[dname]
+            is_top = dname == dept_name
+            bars_html += f"""
+            <div style="margin-bottom:14px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+                    <span style="font-size:13px;font-weight:{'700' if is_top else '400'};
+                                 color:{'#111827' if is_top else '#6b7280'};">
+                        {dinfo['icon']} {dname}
+                    </span>
+                    <span style="font-size:13px;font-weight:{'700' if is_top else '400'};
+                                 color:{dinfo['color'] if is_top else '#9ca3af'};">
+                        {pct:.1f}%
+                    </span>
+                </div>
+                <div style="background:#f3f4f6;border-radius:6px;height:8px;overflow:hidden;">
+                    <div style="background:{'linear-gradient(90deg,'+dinfo['color']+','+dinfo['border']+')' if is_top else '#e5e7eb'};
+                                height:100%;border-radius:6px;width:{pct}%;
+                                transition:width 0.5s ease;"></div>
+                </div>
+            </div>"""
+
+        st.markdown(bars_html + """
+            <div style="margin-top:20px;background:#eff6ff;border:1px solid #bfdbfe;
+                        border-radius:10px;padding:12px 14px;font-size:12px;color:#1e40af;">
+                <strong>Model:</strong> KNN (k=7) · 102,000 patients · 99.5% accuracy<br>
+                <strong>Powered by:</strong> Future Classroom ML
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
